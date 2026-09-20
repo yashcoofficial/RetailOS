@@ -1,45 +1,43 @@
-# Shehzan Enterprises — Inventory Management
+# Shehzan Enterprises — RetailOS
 
-RFID-based retail inventory, sales, and P&L management app.
-
-## Structure
-
-```
-src/
-  lib/            formatting utils, business logic, constants, storage, initial state
-  hooks/          useDerived — computes live stock/product data from raw state
-  components/     shared UI primitives (ui/) and RFID/inventory widgets
-  pages/          one file per app section (Dashboard, POS, Inventory, Products, ...)
-  App.jsx         shell: navigation, routing between pages, top-level state
-  main.jsx        React entry point
-```
+RFID-based retail inventory, sales, and P&L management app with secure admin login and real-time multi-device synchronization.
 
 ## Run locally
 
 ```bash
 npm install
+cp .env.example .env
 npm run dev
 ```
 
-Then open the printed local URL (usually http://localhost:5173).
+## Enable admin synchronization
 
-## Notes
+1. Create a Supabase project.
+2. Open **SQL Editor** in Supabase and run `supabase/migrations/202609200001_admin_realtime_sync.sql`.
+3. In **Authentication → Users**, create the administrator account used to log in to RetailOS. Do not reuse the password that was previously committed to this public repository.
+4. In **Project Settings → API**, copy the project URL and publishable/anon key into `.env`:
 
-- **Login**: the app now sits behind a login screen (see `src/lib/auth.js` for the
-  credentials and `src/components/LoginScreen.jsx` for the UI). This is a
-  client-side-only check — the credentials live in the bundled JS, so anyone with
-  access to the code or browser devtools can read them. It's a basic deterrent for
-  a single-shop tool, not real security. A production deployment should verify
-  credentials against a backend and never ship them in frontend code.
-- **Storage**: data is saved to the browser's `localStorage` (see `src/lib/storage.js`).
-  That means it's per-browser, not shared across devices or synced anywhere. For a
-  real multi-user deployment, swap `loadState`/`saveState` for calls to a real backend
-  and database.
-- **Barcode scanning**: the Brontix X2 (and most similar handheld scanners) read printed
-  barcodes/QR codes, not RFID chips. RetailOS supports this directly — go to a product,
-  click **Print Labels**, and it generates a printable sheet of Code128 barcodes (one per
-  unit, generated with the `jsbarcode` npm package, fully offline) that encode each unit's
-  tag ID. Print, stick on the product, then scan with the X2 into any of RetailOS's scan
-  boxes.
-- **No mock data**: the app starts completely empty. Add products under **Products**,
-  then bring in stock through **Purchases → Receive Stock** by scanning RFID tags.
+```env
+VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+VITE_SUPABASE_ANON_KEY=YOUR_PUBLISHABLE_OR_ANON_KEY
+```
+
+5. Restart the development server.
+
+The first authenticated device initializes the shared database. If that browser has data from the old local-storage version, RetailOS migrates it automatically; otherwise it creates an empty store. After that, products, RFID status, purchases, sales, returns, expenses, settings, and other records are loaded from the shared database on every admin device.
+
+Changes use revision checking to avoid silently overwriting a newer update from another device. Supabase Realtime pushes committed changes to other open admin sessions immediately.
+
+## Security
+
+- Only authenticated Supabase users can read or change the RetailOS state.
+- Create only the administrator account(s) that should access the store.
+- Never put the Supabase `service_role` key in `.env` or frontend code.
+- The previous hard-coded frontend password has been removed. Change that old password anywhere it was reused.
+
+## Build
+
+```bash
+npm run build
+npm run preview
+```

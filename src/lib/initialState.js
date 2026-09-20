@@ -7,7 +7,7 @@ import { uid } from "./utils.js";
 export function buildInitialState() {
   return {
     createdAt: new Date().toISOString(),
-    settings: { shopName: "Shehzan Enterprises", ownerName: "Shehzan", currency: "₹", taxRate: 12, role: "owner", deadStockDays: 30 },
+    settings: { shopName: "Shehzan Enterprises", ownerName: "Shehzan", currency: "₹", taxRate: 12, deadStockDays: 30 },
     vendors: [],
     products: [],
     rfidTags: [],

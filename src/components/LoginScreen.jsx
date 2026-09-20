@@ -3,20 +3,25 @@ import { ScanLine } from "lucide-react";
 import { Card } from "./ui/Card.jsx";
 import { Button } from "./ui/Button.jsx";
 import { TextField } from "./ui/Fields.jsx";
-import { LOGIN_EMAIL, LOGIN_PASSWORD } from "../lib/auth.js";
+import { signIn } from "../lib/cloud.js";
 
 export function LoginScreen({ onSuccess }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    if (email.trim().toLowerCase() === LOGIN_EMAIL.toLowerCase() && password === LOGIN_PASSWORD) {
-      setError("");
-      onSuccess();
-    } else {
-      setError("Incorrect email or password.");
+    setBusy(true);
+    setError("");
+    try {
+      await signIn(email.trim(), password);
+      onSuccess?.();
+    } catch (err) {
+      setError(err.message || "Could not sign in.");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -28,13 +33,13 @@ export function LoginScreen({ onSuccess }) {
             <ScanLine size={22} color="#fff" />
           </div>
           <div className="disp text-lg font-semibold text-center">Shehzan Enterprises</div>
-          <div className="text-xs text-center" style={{ color: "var(--ink-soft)" }}>Sign in to manage your store</div>
+          <div className="text-xs text-center" style={{ color: "var(--ink-soft)" }}>Admin sign in · shared across every device</div>
         </div>
         <form onSubmit={submit} className="flex flex-col gap-3">
           <TextField label="Email" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required />
           <TextField label="Password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
           {error && <div className="text-xs" style={{ color: "var(--danger)" }}>{error}</div>}
-          <Button type="submit" className="w-full mt-1">Sign In</Button>
+          <Button type="submit" className="w-full mt-1" disabled={busy}>{busy ? "Please wait…" : "Sign In"}</Button>
         </form>
       </Card>
     </div>

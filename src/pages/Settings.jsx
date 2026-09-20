@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { Download, ShieldAlert, RotateCcw, LogOut } from "lucide-react";
+import { Download, ShieldAlert, RotateCcw, LogOut, Wifi } from "lucide-react";
 import { Card } from "../components/ui/Card.jsx";
 import { Button } from "../components/ui/Button.jsx";
 import { TextField } from "../components/ui/Fields.jsx";
 import { buildInitialState } from "../lib/initialState.js";
-import { saveState } from "../lib/storage.js";
 
-export function SettingsPage({ state, persist, notify, role, onLogout }) {
+export function SettingsPage({ state, persist, notify, role, onLogout, userEmail }) {
   const [ownerName, setOwnerName] = useState(state.settings.ownerName);
   const [shopName, setShopName] = useState(state.settings.shopName);
   const [taxRate, setTaxRate] = useState(state.settings.taxRate);
@@ -18,10 +17,11 @@ export function SettingsPage({ state, persist, notify, role, onLogout }) {
   };
 
   const resetAll = async () => {
+    if (!window.confirm("Permanently clear all store records? This affects every device and cannot be undone.")) return;
     const fresh = buildInitialState();
-    await saveState(fresh);
+    fresh.settings = { ...fresh.settings, ...state.settings };
+    await persist(fresh);
     notify("All data cleared.", "accent");
-    setTimeout(() => window.location.reload(), 600);
   };
 
   const exportAll = (key) => {
@@ -39,7 +39,7 @@ export function SettingsPage({ state, persist, notify, role, onLogout }) {
       <Card className="p-4 flex items-center justify-between">
         <div>
           <div className="disp font-medium text-sm">Session</div>
-          <div className="text-xs" style={{ color: "var(--ink-soft)" }}>Signed in as {role === "owner" ? (state.settings.ownerName || "Shehzan") : "Staff"}</div>
+          <div className="text-xs" style={{ color: "var(--ink-soft)" }}>{state.settings.ownerName || "Admin"} · {userEmail} · Admin</div>
         </div>
         <Button variant="soft" size="sm" icon={LogOut} onClick={onLogout}>Log Out</Button>
       </Card>
@@ -58,10 +58,8 @@ export function SettingsPage({ state, persist, notify, role, onLogout }) {
       </Card>
 
       <Card className="p-4 flex flex-col gap-2">
-        <div className="disp font-medium text-sm">Data Storage</div>
-        <div className="text-xs" style={{ color: "var(--ink-soft)" }}>
-          This app stores your shop's data in this browser's local storage. Clearing your browser data will erase it. For multi-device or multi-user access, connect it to a real backend and database.
-        </div>
+        <div className="disp font-medium text-sm flex items-center gap-1.5"><Wifi size={15} style={{ color: "var(--accent)" }} /> Cloud Sync Active</div>
+        <div className="text-xs" style={{ color: "var(--ink-soft)" }}>Changes are stored securely in the shared database and sent to every signed-in device in real time.</div>
       </Card>
 
       {role === "owner" && (
