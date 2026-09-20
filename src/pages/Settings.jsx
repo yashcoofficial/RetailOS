@@ -59,7 +59,7 @@ export function SettingsPage({ state, persist, notify, role, onLogout, userEmail
 
       <Card className="p-4 flex flex-col gap-2">
         <div className="disp font-medium text-sm flex items-center gap-1.5"><Wifi size={15} style={{ color: syncEnabled ? "var(--accent)" : "var(--ink-faint)" }} /> {syncEnabled ? "Cloud Sync Active" : "Local Storage"}</div>
-        <div className="text-xs" style={{ color: "var(--ink-soft)" }}>{syncEnabled ? "Changes are stored in the shared database and sent to every signed-in device in real time." : "This device is using browser storage. Cloud synchronization activates automatically when Supabase environment variables are configured."}</div>
+        <div className="text-xs" style={{ color: "var(--ink-soft)" }}>{syncEnabled ? "Changes are stored in the Vercel-hosted shared store and appear on every signed-in device." : "Shared storage is unavailable."}</div>
       </Card>
 
       {role === "owner" && (

@@ -1,65 +1,73 @@
-import { supabase } from "./supabase.js";
+const POLL_INTERVAL_MS = 3500;
 
-function client() {
-  if (!supabase) throw new Error("Supabase is not configured.");
-  return supabase;
-}
+async function requestJson(path, method = "GET", body) {
+  const response = await fetch(path, {
+    method,
+    cache: "no-store",
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
 
-function unwrap(result) {
-  if (result.error) throw result.error;
-  return result.data;
+  const payload = await response.json().catch(() => ({}));
+  if (response.status === 409) return { conflict: true, snapshot: payload.snapshot || null };
+  if (!response.ok) throw new Error(payload.error || "Shared store data is unavailable.");
+  return payload;
 }
 
 export async function getCurrentSession() {
-  return unwrap(await client().auth.getSession()).session;
-}
-
-export function onAuthStateChange(callback) {
-  const { data } = client().auth.onAuthStateChange((event, session) => callback(event, session));
-  return () => data.subscription.unsubscribe();
+  const result = await requestJson("/api/session");
+  return result.session || null;
 }
 
 export async function signIn(email, password) {
-  return unwrap(await client().auth.signInWithPassword({ email, password }));
+  const result = await requestJson("/api/session", "POST", { email, password });
+  return result.session;
 }
 
 export async function signOut() {
-  unwrap(await client().auth.signOut());
+  await requestJson("/api/session", "DELETE");
 }
 
 export async function loadSharedState() {
-  const { data, error } = await client()
-    .from("retailos_states")
-    .select("data, revision")
-    .eq("store_key", "primary")
-    .maybeSingle();
-  if (error) throw error;
-  return data;
+  const result = await requestJson("/api/state");
+  return result.snapshot || null;
 }
 
 export async function initializeSharedState(data) {
-  unwrap(await client().rpc("retailos_initialize_state", { p_data: data }));
-  return loadSharedState();
+  const result = await requestJson("/api/state", "POST", { data, expectedRevision: 0 });
+  if (result.conflict) return result.snapshot;
+  return result.snapshot;
 }
 
 export async function saveSharedState(expectedRevision, data) {
-  const revision = unwrap(
-    await client().rpc("retailos_save_state", {
-      p_expected_revision: expectedRevision,
-      p_data: data,
-    }),
-  );
-  return Number(revision);
+  const result = await requestJson("/api/state", "PUT", { data, expectedRevision });
+  if (result.conflict) return -1;
+  return Number(result.snapshot.revision);
 }
 
-export function subscribeToSharedState(onState) {
-  const channel = client()
-    .channel("retailos-admin-live")
-    .on(
-      "postgres_changes",
-      { event: "UPDATE", schema: "public", table: "retailos_states", filter: "store_key=eq.primary" },
-      (payload) => onState(payload.new),
-    )
-    .subscribe();
-  return () => client().removeChannel(channel);
+export function subscribeToSharedState(onState, onError) {
+  let active = true;
+  let checking = false;
+
+  const check = async () => {
+    if (!active || checking) return;
+    checking = true;
+    try {
+      const snapshot = await loadSharedState();
+      if (active && snapshot) onState(snapshot);
+    } catch (error) {
+      if (active) onError?.(error);
+    } finally {
+      checking = false;
+    }
+  };
+
+  const timer = window.setInterval(check, POLL_INTERVAL_MS);
+  return () => {
+    active = false;
+    window.clearInterval(timer);
+  };
 }

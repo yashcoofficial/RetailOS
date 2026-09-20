@@ -18,19 +18,16 @@ import { PnL } from "./pages/PnL.jsx";
 import { SettingsPage } from "./pages/Settings.jsx";
 import { useDerived } from "./hooks/useDerived.js";
 import { buildInitialState } from "./lib/initialState.js";
-import { loadState, saveState } from "./lib/storage.js";
-import { LOGIN_EMAIL, isLocallyAuthed, setLocallyAuthed } from "./lib/auth.js";
+import { saveState } from "./lib/storage.js";
 import { NAV } from "./lib/constants.js";
 import { uid } from "./lib/utils.js";
-import { isCloudConfigured } from "./lib/supabase.js";
 import {
-  getCurrentSession,
-  onAuthStateChange,
   loadSharedState,
+  getCurrentSession,
   initializeSharedState,
   saveSharedState,
-  subscribeToSharedState,
   signOut,
+  subscribeToSharedState,
 } from "./lib/cloud.js";
 
 const LEGACY_STORAGE_KEY = "retailos-shop-state-v1";
@@ -45,11 +42,14 @@ function initialCloudData() {
   return buildInitialState();
 }
 
+function hasBusinessData(data) {
+  return ["products", "sales", "purchases", "expenses", "vendors"].some((key) => data?.[key]?.length > 0);
+}
+
 export default function App() {
   const [session, setSession] = useState(null);
-  const [localAuthed, setLocalAuthed] = useState(isLocallyAuthed());
-  const [state, setState] = useState(null);
   const [authReady, setAuthReady] = useState(false);
+  const [state, setState] = useState(null);
   const [dataLoading, setDataLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [page, setPage] = useState("dashboard");
@@ -60,7 +60,7 @@ export default function App() {
   const stateRef = useRef(null);
   const revisionRef = useRef(0);
   const persistQueue = useRef(Promise.resolve());
-  const authenticated = isCloudConfigured ? Boolean(session) : localAuthed;
+  const authenticated = Boolean(session);
 
   const notify = useCallback((msg, tone = "accent") => {
     const id = uid("toast");
@@ -72,21 +72,18 @@ export default function App() {
     setDataLoading(true);
     setLoadError("");
     try {
-      if (isCloudConfigured) {
-        let snapshot = await loadSharedState();
-        if (!snapshot) snapshot = await initializeSharedState(initialCloudData());
-        setState(snapshot.data);
-        stateRef.current = snapshot.data;
-        revisionRef.current = Number(snapshot.revision);
-      } else {
-        let localState = await loadState();
-        if (!localState) {
-          localState = buildInitialState();
-          await saveState(localState);
-        }
-        setState(localState);
-        stateRef.current = localState;
+      const localData = initialCloudData();
+      let snapshot = await loadSharedState();
+      if (!snapshot) {
+        snapshot = await initializeSharedState(localData);
+      } else if (!hasBusinessData(snapshot.data) && hasBusinessData(localData)) {
+        const migratedRevision = await saveSharedState(Number(snapshot.revision), localData);
+        snapshot = migratedRevision === -1 ? await loadSharedState() : { data: localData, revision: migratedRevision };
       }
+      await saveState(snapshot.data);
+      setState(snapshot.data);
+      stateRef.current = snapshot.data;
+      revisionRef.current = Number(snapshot.revision);
     } catch (err) {
       setLoadError(err.message || "Could not load shared store data.");
     } finally {
@@ -95,22 +92,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!isCloudConfigured) {
-      setAuthReady(true);
-      return undefined;
-    }
     let active = true;
     getCurrentSession()
-      .then((nextSession) => { if (active) setSession(nextSession); })
-      .catch((err) => { if (active) setLoadError(err.message); })
+      .then((current) => { if (active) setSession(current); })
+      .catch(() => { if (active) setSession(null); })
       .finally(() => { if (active) setAuthReady(true); });
-    const unsubscribe = onAuthStateChange((_event, nextSession) => {
-      if (active) {
-        setSession(nextSession);
-        setAuthReady(true);
-      }
-    });
-    return () => { active = false; unsubscribe(); };
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -120,29 +107,22 @@ export default function App() {
       return;
     }
     loadData();
-  }, [authenticated, session?.user?.id, loadData]);
+  }, [authenticated, loadData]);
 
   useEffect(() => {
-    if (!isCloudConfigured || !session || !state) return undefined;
+    if (!authenticated || !state) return undefined;
     return subscribeToSharedState((record) => {
       const incomingRevision = Number(record.revision);
       if (incomingRevision <= revisionRef.current) return;
       revisionRef.current = incomingRevision;
       stateRef.current = record.data;
       setState(record.data);
-    });
-  }, [session?.user?.id, Boolean(state)]);
+      saveState(record.data);
+    }, (error) => notify(error.message || "Live sync is temporarily unavailable.", "danger"));
+  }, [authenticated, Boolean(state), notify]);
 
   const persist = useCallback((updater) => {
     const commit = async () => {
-      if (!isCloudConfigured) {
-        const base = stateRef.current;
-        const next = typeof updater === "function" ? updater(base) : updater;
-        await saveState(next);
-        stateRef.current = next;
-        setState(next);
-        return next;
-      }
       for (let attempt = 0; attempt < 4; attempt += 1) {
         const base = stateRef.current;
         const next = typeof updater === "function" ? updater(base) : updater;
@@ -157,6 +137,7 @@ export default function App() {
         revisionRef.current = nextRevision;
         stateRef.current = next;
         setState(next);
+        await saveState(next);
         return next;
       }
       throw new Error("Store data changed on another device. Please try again.");
@@ -170,11 +151,8 @@ export default function App() {
   }, [notify]);
 
   const handleLogout = useCallback(async () => {
-    if (isCloudConfigured) await signOut();
-    else {
-      setLocallyAuthed(false);
-      setLocalAuthed(false);
-    }
+    await signOut();
+    setSession(null);
     setPage("dashboard");
     setCart([]);
   }, []);
@@ -193,7 +171,7 @@ export default function App() {
   }, [role]);
 
   if (!authReady) return <LoadingScreen label="Connecting securely…" />;
-  if (!authenticated) return <LoginScreen onSuccess={() => setLocalAuthed(true)} />;
+  if (!authenticated) return <LoginScreen onSuccess={(current) => setSession(current)} />;
   if (dataLoading) return <LoadingScreen label="Loading shared store data…" />;
   if (loadError) {
     return (
@@ -208,7 +186,7 @@ export default function App() {
   }
   if (!state || !derived) return <LoadingScreen label="Loading shared store data…" />;
 
-  const pageProps = { state, derived, persist, notify, role, cart, setCart, userEmail: session?.user?.email || LOGIN_EMAIL, syncEnabled: isCloudConfigured, onLogout: handleLogout };
+  const pageProps = { state, derived, persist, notify, role, cart, setCart, userEmail: session.email, syncEnabled: true, onLogout: handleLogout };
   const adminProfile = { full_name: state.settings.ownerName || "Admin" };
 
   return (
@@ -234,7 +212,7 @@ export default function App() {
             <div className="disp font-semibold text-[15px] truncate">{NAV.find((n) => n.id === page)?.label}</div>
           </div>
           <div className="flex items-center gap-3">
-            {isCloudConfigured && <div className="hidden sm:flex items-center gap-1.5 text-xs font-medium" style={{ color: "var(--accent)" }}><Wifi size={14} /> Live sync</div>}
+            <div className="hidden sm:flex items-center gap-1.5 text-xs font-medium" style={{ color: "var(--accent)" }}><Wifi size={14} /> Live sync</div>
             <RoleSwitcher role={role} setRole={setRole} ownerName={state.settings.ownerName} />
           </div>
         </header>

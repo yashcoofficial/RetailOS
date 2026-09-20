@@ -1,41 +1,31 @@
 # Shehzan Enterprises — RetailOS
 
-RFID-based retail inventory, sales, and P&L management app with secure admin login and real-time multi-device synchronization.
+RFID-based retail inventory, sales, and P&L management app with admin login and multi-device synchronization through the same Vercel project that hosts the app.
 
 ## Run locally
 
 ```bash
 npm install
-cp .env.example .env
 npm run dev
 ```
 
-## Enable admin synchronization
+## Enable admin synchronization on Vercel
 
-1. Create a Supabase project.
-2. Open **SQL Editor** in Supabase and run `supabase/migrations/202609200001_admin_realtime_sync.sql`.
-3. In **Authentication → Users**, create the administrator account used to log in to RetailOS. Do not reuse the password that was previously committed to this public repository.
-4. In **Project Settings → API**, copy the project URL and publishable/anon key into `.env`:
+1. Open the RetailOS project in the Vercel dashboard.
+2. Open **Storage**, create a **Blob** store, and connect it to this project.
+3. In **Settings → Environment Variables**, add `RETAILOS_ADMIN_EMAIL`, `RETAILOS_ADMIN_PASSWORD_SHA256`, and `RETAILOS_SESSION_SECRET`. Use the existing admin email, the SHA-256 value of the existing password, and a new long random session secret.
+4. Redeploy the latest `main` branch.
+5. First sign in on the device that already contains the shop data. RetailOS automatically migrates that browser's products and records into the shared store.
 
-```env
-VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-VITE_SUPABASE_ANON_KEY=YOUR_PUBLISHABLE_OR_ANON_KEY
-```
+No Supabase project or frontend cloud environment variables are used. Products, RFID state, inventory, purchases, sales, returns, expenses, vendors, settings, dashboard statistics, and reports are stored in one private Vercel Blob object and loaded on every signed-in device. Open sessions check for updates every few seconds.
 
-5. Restart the development server.
-
-The first authenticated device initializes the shared database. If that browser has data from the old local-storage version, RetailOS migrates it automatically; otherwise it creates an empty store. After that, products, RFID status, purchases, sales, returns, expenses, settings, and other records are loaded from the shared database on every admin device.
-
-Changes use revision checking to avoid silently overwriting a newer update from another device. Supabase Realtime pushes committed changes to other open admin sessions immediately.
-
-The login page is always shown when the administrator is signed out. If Supabase variables have not been configured yet, the existing administrator credentials open RetailOS in local-storage mode instead of displaying a setup screen. For cloud mode, create the Supabase administrator with those same credentials.
+Writes use revision and ETag checks so two devices cannot silently overwrite each other's newer changes. A successful shared write is also cached locally as a recovery copy.
 
 ## Security
 
-- Only authenticated Supabase users can read or change the RetailOS state.
-- Create only the administrator account(s) that should access the store.
-- Never put the Supabase `service_role` key in `.env` or frontend code.
-- The local fallback retains the existing login through a client-side password hash. Because this repository and frontend bundle are public, this is not production-grade authentication. Migrate fully to Supabase Auth and rotate any password previously committed to Git history.
+- The Blob store is private and accessed only by the server-side `/api/state` function.
+- Admin credentials are checked by `/api/session` on the server. The browser receives an HTTP-only signed cookie; neither the password hash nor the Blob token is included in the frontend bundle.
+- Rotate any password previously committed to Git history.
 
 ## Build
 
