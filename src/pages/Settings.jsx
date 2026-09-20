@@ -5,7 +5,7 @@ import { Button } from "../components/ui/Button.jsx";
 import { TextField } from "../components/ui/Fields.jsx";
 import { buildInitialState } from "../lib/initialState.js";
 
-export function SettingsPage({ state, persist, notify, role, onLogout, userEmail }) {
+export function SettingsPage({ state, persist, notify, role, onLogout, userEmail, syncEnabled }) {
   const [ownerName, setOwnerName] = useState(state.settings.ownerName);
   const [shopName, setShopName] = useState(state.settings.shopName);
   const [taxRate, setTaxRate] = useState(state.settings.taxRate);
@@ -58,8 +58,8 @@ export function SettingsPage({ state, persist, notify, role, onLogout, userEmail
       </Card>
 
       <Card className="p-4 flex flex-col gap-2">
-        <div className="disp font-medium text-sm flex items-center gap-1.5"><Wifi size={15} style={{ color: "var(--accent)" }} /> Cloud Sync Active</div>
-        <div className="text-xs" style={{ color: "var(--ink-soft)" }}>Changes are stored securely in the shared database and sent to every signed-in device in real time.</div>
+        <div className="disp font-medium text-sm flex items-center gap-1.5"><Wifi size={15} style={{ color: syncEnabled ? "var(--accent)" : "var(--ink-faint)" }} /> {syncEnabled ? "Cloud Sync Active" : "Local Storage"}</div>
+        <div className="text-xs" style={{ color: "var(--ink-soft)" }}>{syncEnabled ? "Changes are stored in the shared database and sent to every signed-in device in real time." : "This device is using browser storage. Cloud synchronization activates automatically when Supabase environment variables are configured."}</div>
       </Card>
 
       {role === "owner" && (

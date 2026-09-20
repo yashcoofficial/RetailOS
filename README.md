@@ -20,6 +20,8 @@ npm run dev
 ```env
 VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 VITE_SUPABASE_ANON_KEY=YOUR_PUBLISHABLE_OR_ANON_KEY
+VITE_ADMIN_EMAIL=YOUR_EXISTING_ADMIN_EMAIL
+VITE_ADMIN_PASSWORD_SHA256=SHA256_OF_YOUR_EXISTING_ADMIN_PASSWORD
 ```
 
 5. Restart the development server.
@@ -28,12 +30,14 @@ The first authenticated device initializes the shared database. If that browser 
 
 Changes use revision checking to avoid silently overwriting a newer update from another device. Supabase Realtime pushes committed changes to other open admin sessions immediately.
 
+The login page is always shown when the administrator is signed out. If Supabase variables have not been configured yet, set `VITE_ADMIN_EMAIL` and `VITE_ADMIN_PASSWORD_SHA256` in the deployment environment so the same existing administrator credentials open RetailOS in local-storage mode instead of displaying a setup screen. For cloud mode, create the Supabase administrator with those same credentials.
+
 ## Security
 
 - Only authenticated Supabase users can read or change the RetailOS state.
 - Create only the administrator account(s) that should access the store.
 - Never put the Supabase `service_role` key in `.env` or frontend code.
-- The previous hard-coded frontend password has been removed. Change that old password anywhere it was reused.
+- The existing login is retained without storing its plaintext password in the current frontend source. For production security, migrate fully to Supabase Auth and rotate any password previously committed to Git history.
 
 ## Build
 

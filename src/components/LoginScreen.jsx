@@ -4,6 +4,8 @@ import { Card } from "./ui/Card.jsx";
 import { Button } from "./ui/Button.jsx";
 import { TextField } from "./ui/Fields.jsx";
 import { signIn } from "../lib/cloud.js";
+import { isCloudConfigured } from "../lib/supabase.js";
+import { hasLocalAdminCredentials, validateAdminLogin, setLocallyAuthed } from "../lib/auth.js";
 
 export function LoginScreen({ onSuccess }) {
   const [email, setEmail] = useState("");
@@ -16,7 +18,20 @@ export function LoginScreen({ onSuccess }) {
     setBusy(true);
     setError("");
     try {
-      await signIn(email.trim(), password);
+      if (isCloudConfigured) {
+        await signIn(email.trim(), password);
+      } else {
+        if (!hasLocalAdminCredentials) {
+          setError("Admin login is not configured for this deployment.");
+          return;
+        }
+        const valid = await validateAdminLogin(email, password);
+        if (!valid) {
+          setError("Incorrect email or password.");
+          return;
+        }
+        setLocallyAuthed(true);
+      }
       onSuccess?.();
     } catch (err) {
       setError(err.message || "Could not sign in.");
