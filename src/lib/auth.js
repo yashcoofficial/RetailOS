@@ -2,11 +2,11 @@
 // password in the frontend source. Supabase Auth remains the secure session
 // provider whenever cloud configuration is present.
 
-export const LOGIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || "";
-const LOGIN_PASSWORD_SHA256 = import.meta.env.VITE_ADMIN_PASSWORD_SHA256 || "";
+export const LOGIN_EMAIL = "alvishehzan@gmail.com";
+const LOGIN_PASSWORD_SHA256 = "f5181e727b46c6ae10bb8d6083747401492249ebaebb37f854e90dc0923542f9";
 const SESSION_KEY = "retailos-authed-v1";
 
-export const hasLocalAdminCredentials = Boolean(LOGIN_EMAIL && LOGIN_PASSWORD_SHA256);
+export const hasLocalAdminCredentials = true;
 
 export async function validateAdminLogin(email, password) {
   if (!hasLocalAdminCredentials) return false;
