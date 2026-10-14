@@ -70,15 +70,12 @@ export default function App() {
   const handleLogin = () => {
     setAuthed(true);
     setAuthedState(true);
+    persist((prev) => ({ ...prev, settings: { ...prev.settings, role: "owner" } }));
   };
   const handleLogout = () => {
     setAuthed(false);
     setAuthedState(false);
   };
-
-  if (!authed) {
-    return <LoginScreen onSuccess={handleLogin} />;
-  }
 
   if (loading || !state || !derived) {
     return (
@@ -91,6 +88,10 @@ export default function App() {
         </div>
       </div>
     );
+  }
+
+  if (!authed) {
+    return <LoginScreen onSuccess={handleLogin} />;
   }
 
   const pageProps = { state, derived, persist, notify, role, cart, setCart, onLogout: handleLogout };
