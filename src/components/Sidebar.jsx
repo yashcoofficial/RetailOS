@@ -1,7 +1,7 @@
 import { ScanLine, User } from "lucide-react";
 import { Badge } from "./ui/Badge.jsx";
 
-export function SidebarContent({ nav, page, setPage, state, role }) {
+export function SidebarContent({ nav, page, setPage, state, role, profile }) {
   return (
     <>
       <div className="flex items-center gap-2 px-4 h-14 border-b" style={{ borderColor: "var(--line)" }}>
@@ -31,7 +31,7 @@ export function SidebarContent({ nav, page, setPage, state, role }) {
         })}
       </div>
       <div className="p-3 border-t text-xs flex items-center gap-2" style={{ borderColor: "var(--line)", color: "var(--ink-faint)" }}>
-        <User size={13} /> Signed in as <Badge tone={role === "owner" ? "accent" : "info"}>{role === "owner" ? state.settings.ownerName || "Shehzan" : "Staff"}</Badge>
+        <User size={13} /> Signed in as <Badge tone={role === "owner" ? "accent" : "info"}>{profile?.full_name || (role === "owner" ? "Owner" : "Retailer")}</Badge>
       </div>
     </>
   );

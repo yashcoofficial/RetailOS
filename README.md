@@ -1,18 +1,6 @@
-# Shehzan Enterprises — Inventory Management
+# Shehzan Enterprises — RetailOS
 
-RFID-based retail inventory, sales, and P&L management app.
-
-## Structure
-
-```
-src/
-  lib/            formatting utils, business logic, constants, storage, initial state
-  hooks/          useDerived — computes live stock/product data from raw state
-  components/     shared UI primitives (ui/) and RFID/inventory widgets
-  pages/          one file per app section (Dashboard, POS, Inventory, Products, ...)
-  App.jsx         shell: navigation, routing between pages, top-level state
-  main.jsx        React entry point
-```
+RFID-based retail inventory, sales, and P&L management app with admin login and multi-device synchronization through the same Vercel project that hosts the app.
 
 ## Run locally
 
@@ -21,25 +9,27 @@ npm install
 npm run dev
 ```
 
-Then open the printed local URL (usually http://localhost:5173).
+## Enable admin synchronization on Vercel
 
-## Notes
+1. Open the RetailOS project in the Vercel dashboard.
+2. Open **Storage**, create a **Blob** store, and connect it to this project.
+3. In **Settings → Environment Variables**, add `RETAILOS_ADMIN_EMAIL`, `RETAILOS_ADMIN_PASSWORD_SHA256`, and `RETAILOS_SESSION_SECRET`. Use the existing admin email, the SHA-256 value of the existing password, and a new long random session secret.
+4. Redeploy the latest `main` branch.
+5. First sign in on the device that already contains the shop data. RetailOS automatically migrates that browser's products and records into the shared store.
 
-- **Login**: the app now sits behind a login screen (see `src/lib/auth.js` for the
-  credentials and `src/components/LoginScreen.jsx` for the UI). This is a
-  client-side-only check — the credentials live in the bundled JS, so anyone with
-  access to the code or browser devtools can read them. It's a basic deterrent for
-  a single-shop tool, not real security. A production deployment should verify
-  credentials against a backend and never ship them in frontend code.
-- **Storage**: data is saved to the browser's `localStorage` (see `src/lib/storage.js`).
-  That means it's per-browser, not shared across devices or synced anywhere. For a
-  real multi-user deployment, swap `loadState`/`saveState` for calls to a real backend
-  and database.
-- **Barcode scanning**: the Brontix X2 (and most similar handheld scanners) read printed
-  barcodes/QR codes, not RFID chips. RetailOS supports this directly — go to a product,
-  click **Print Labels**, and it generates a printable sheet of Code128 barcodes (one per
-  unit, generated with the `jsbarcode` npm package, fully offline) that encode each unit's
-  tag ID. Print, stick on the product, then scan with the X2 into any of RetailOS's scan
-  boxes.
-- **No mock data**: the app starts completely empty. Add products under **Products**,
-  then bring in stock through **Purchases → Receive Stock** by scanning RFID tags.
+No Supabase project or frontend cloud environment variables are used. Products, RFID state, inventory, purchases, sales, returns, expenses, vendors, settings, dashboard statistics, and reports are stored in one private Vercel Blob object and loaded on every signed-in device. Open sessions check for updates every few seconds.
+
+Writes use revision and ETag checks so two devices cannot silently overwrite each other's newer changes. A successful shared write is also cached locally as a recovery copy.
+
+## Security
+
+- The Blob store is private and accessed only by the server-side `/api/state` function.
+- Admin credentials are checked by `/api/session` on the server. The browser receives an HTTP-only signed cookie; neither the password hash nor the Blob token is included in the frontend bundle.
+- Rotate any password previously committed to Git history.
+
+## Build
+
+```bash
+npm run build
+npm run preview
+```
